@@ -4,6 +4,7 @@ import com.mongodb.*;
 import com.mongodb.client.*;
 import org.bson.Document;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 
@@ -64,17 +65,20 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
 
         // Access the specified database
         MongoDatabase database = client.getDatabase(connString.getDatabase());
-
         // List all collections in the database
         ListCollectionsIterable<Document> collections = database.listCollections();
 
         // Iterate through the collections and print their names
         try {
             // Iterate through the collections and print their names
-            collections.forEach(collectionInfo -> {
-                String collectionName = collectionInfo.getString("name");
-                System.out.println("Collection: " + collectionName);
-            });
+            if (!collections.iterator().hasNext()) {
+                System.out.println("The database has no collections.");
+            } else {
+                // Iterate through the collections and print their names
+                collections.forEach(collectionInfo -> {
+                    String collectionName = collectionInfo.getString("name");
+                });
+            }
         } catch (Throwable throwable) {
             // Handle the exception here
             System.err.println("Exception during MongoDB connection:");
@@ -116,7 +120,6 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        System.out.println(result);
         return result;
     }
 
@@ -230,6 +233,25 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
         }
         return result;
     }
+    @Override
+    public List<Map<String, Object>> executeQueriesAndReturnFirstResult(String query) {
+        System.out.println(query);
+        List<Map<String, Object>> firstResult = null;
+
+        String[] queries = query.split(";");
+        for (String individualQuery : queries) {
+            individualQuery = individualQuery.trim();
+            if (!individualQuery.isEmpty()) {
+                List<Map<String, Object>> result = executeQuery(individualQuery);
+                if (!result.isEmpty()) {
+                    firstResult = result;
+                    break;
+                }
+            }
+        }
+
+        return firstResult;
+    }
 
     @Override
     public List<Map<String, Object>> executeQuery(String query) {
@@ -257,7 +279,6 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-
         return result;
     }
 
@@ -329,14 +350,21 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
     }
 
     @Override
-    public Map<String, Map<String, Map<String, List<String>>>> buildTableInfoMongo(String connectionString, String databaseName, JSONArray collections) {
+    public Map<String, Map<String, Map<String, List<String>>>> buildTableInfoMongo(String connectionString, JSONArray collections) {
         Map<String, Map<String, Map<String, List<String>>>> result = new TreeMap<>();
-        System.out.println(collections);
         try (MongoClient mongoClient = MongoClients.create(connectionString)) {
-            MongoDatabase database = mongoClient.getDatabase(databaseName);
+            ConnectionString connString = new ConnectionString(connectionString);
+            MongoDatabase database = mongoClient.getDatabase(connString.getDatabase());
 
             for (int i = 0; i < collections.length(); i++) {
                 JSONObject collectionObj = collections.getJSONObject(i);
+
+                if (!collectionObj.has("collectionName") || !collectionObj.has("fields")) {
+                    // Handle missing collection name or fields
+                    // You can log an error, throw an exception, or handle it as appropriate
+                    continue; // Skip this iteration and proceed to the next collection
+                }
+
                 String collectionName = collectionObj.getString("collectionName");
                 JSONObject fieldsObj = collectionObj.getJSONObject("fields");
 
@@ -359,20 +387,55 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
 
                 result.put(collectionName, collectionInfo);
             }
+        } catch (JSONException e) {
+            // Handle JSON parsing exceptions
+            e.printStackTrace(); // You can log the error or take other actions
+        } catch (MongoException e) {
+            // Handle MongoDB-related exceptions
+            e.printStackTrace(); // You can log the error or take other actions
         }
 
         return result;
-
     }
-    private List<String> getFieldNamesMongo(MongoCollection<Document> collection) {
-        List<String> fieldNames = new ArrayList<>();
 
-        collection.find().limit(1).forEach((Document document) -> {
-            fieldNames.addAll(document.keySet());
-        });
+    @Override
+    public List<Map<String, Object>> executeMongoQueries(String connectionString , Map<String, Object> queryMap) {
+        List<Map<String, Object>> resultList = new ArrayList<>();
 
-        return fieldNames;
+        try (MongoClient mongoClient = MongoClients.create(connectionString)) {
+            ConnectionString connString = new ConnectionString(connectionString);
+            MongoDatabase database = mongoClient.getDatabase(connString.getDatabase());
+
+            // Assuming the queries are in the "queries" sub-map
+            Map<String, Object> queries = (Map<String, Object>) queryMap.get("queries");
+
+            for (Map.Entry<String, Object> entry : queries.entrySet()) {
+                Object conditionsObject = entry.getValue();
+
+                try {
+                    BasicDBObject conditionQuery = new BasicDBObject((Map<String, Object>) conditionsObject);
+
+                    MongoCollection<Document> collection = database.getCollection(entry.getKey());
+                    FindIterable<Document> queryResult = collection.find(conditionQuery);
+
+                    for (Document document : queryResult) {
+                        Map<String, Object> resultMap = new HashMap<>(document);
+                        resultList.add(resultMap);
+                    }
+                } catch (Exception e) {
+                    // Handle exceptions appropriately (throw a custom exception or log)
+                    e.printStackTrace();
+                }
+            }
+        } catch (Exception e) {
+            // Handle exceptions appropriately (throw a custom exception or log)
+            e.printStackTrace();
+        }
+        return resultList;
     }
+
+
+
 
     private List<String> getFieldValuesMongo(MongoCollection<Document> collection, String fieldName) {
         List<String> fieldTextValues = new ArrayList<>();

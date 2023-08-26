@@ -2,6 +2,7 @@ package com.example.demo.service;
 
 import com.example.demo.entity.ColumnMetadata;
 import com.example.demo.entity.TableMetadata;
+import org.bson.Document;
 import org.json.JSONArray;
 
 import java.util.List;
@@ -45,12 +46,17 @@ public interface DatabaseMetadataService {
 
     Map<String, Map<String, Map<String, List<String>>>> buildTableInfoSql(String url, String username, String password, JSONArray tables);
 
+
+    List<Map<String, Object>> executeQueriesAndReturnFirstResult(String query);
+
     List<Map<String, Object>> executeQuery(String query);
 
     JSONArray getMongoMetaData(String url);
 
 
-    Map<String, Map<String, Map<String, List<String>>>> buildTableInfoMongo(String connectionString, String databaseName, JSONArray collections);
+    Map<String, Map<String, Map<String, List<String>>>> buildTableInfoMongo(String connectionString, JSONArray collections);
+
+    List<Map<String, Object>> executeMongoQueries(String connectionString, Map<String, Object> queryMap);
 }
 
 
