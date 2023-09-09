@@ -1,13 +1,17 @@
 package com.example.demo.controller;
 
+import com.example.demo.entity.Database;
+import com.example.demo.entity.Utilisateur;
+import com.example.demo.repository.DatabaseRepo;
+import com.example.demo.repository.UserRepo;
 import com.example.demo.service.DatabaseMetadataService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.bson.Document;
 import org.json.JSONArray;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
 import java.io.IOException;
 import java.util.*;
 
@@ -17,14 +21,20 @@ public class TableController {
 
 
     private final DatabaseMetadataService databaseMetadataService;
+    private final DatabaseRepo dbRepo;
+    private final UserRepo userRepository;
 
-    public TableController(DatabaseMetadataService databaseMetadataService) {
+    public TableController(DatabaseMetadataService databaseMetadataService, DatabaseRepo dbRepo, UserRepo userRepository) {
         this.databaseMetadataService = databaseMetadataService;
+        this.dbRepo = dbRepo;
+        this.userRepository = userRepository;
     }
 
 
     @PostMapping("/connect")
     public ResponseEntity<?> connect(@RequestBody Map<String, String> request) {
+        String databaseType = request.get("selectedDatabaseType");
+        String databaseName = request.get("databaseName");
         String url = request.get("url");
         String username = request.get("username");
         String password = request.get("password");
@@ -49,7 +59,16 @@ public class TableController {
             } else {
                 result = databaseMetadataService.buildTableInfoSql(url, username, password, tables); // Assuming buildTableInfoSql method is implemented
             }
+            Database db = new Database();
+            db.setType(databaseType);
+            db.setDatabaseName(databaseName);
+            db.setUrl(url);
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String connectedUsername = authentication.getName();
+            Utilisateur utilisateur = userRepository.findById(connectedUsername).orElse(null);
 
+            db.setUtilisateur(utilisateur);
+            dbRepo.save(db);
             return ResponseEntity.ok(result);
         } catch (RuntimeException e) {
             databaseMetadataService.stopRealTimeUpdates();

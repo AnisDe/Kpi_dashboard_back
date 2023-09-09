@@ -1,29 +1,34 @@
 package com.example.demo.service;
 
+import com.example.demo.repository.UserRepo;
 import com.mongodb.*;
 import com.mongodb.client.*;
 import org.bson.Document;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.keycloak.KeycloakPrincipal;
+
 
 import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.springframework.security.core.Authentication;
 
 @Service
 public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
     private Connection connection;
-    private MongoClient mongoClient;  // Add this line
-    private MongoDatabase database;
     private String url;
     private String username;
     private String password;
     private MetadataUpdateThread updateThread;
+    UserRepo userRepo;
 
     @Override
-    public void connect(String url, String username, String password) {
+    public void connect(String url, String username, String password ) {
+
         try {
             this.url = url;
             this.username = username;
