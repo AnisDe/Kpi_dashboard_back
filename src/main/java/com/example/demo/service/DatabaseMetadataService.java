@@ -46,6 +46,10 @@ public interface DatabaseMetadataService {
     Map<String, Map<String, Map<String, List<String>>>> buildTableInfoMongo(String connectionString, JSONArray collections);
 
     List<Map<String, Object>> executeMongoQueries(String connectionString, Map<String, Object> queryMap);
+
+    void disconnect(String url);
+
+
 }
 
 

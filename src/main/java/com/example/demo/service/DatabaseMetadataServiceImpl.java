@@ -1,30 +1,30 @@
 package com.example.demo.service;
 
-import com.example.demo.repository.UserRepo;
-import com.mongodb.*;
+import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
+import com.mongodb.MongoException;
 import com.mongodb.client.*;
 import org.bson.Document;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.keycloak.KeycloakPrincipal;
-
 
 import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
-import org.springframework.security.core.Authentication;
+
 
 @Service
 public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
     private Connection connection;
+
+    private static MongoClient client;
     private String url;
     private String username;
     private String password;
     private MetadataUpdateThread updateThread;
-    UserRepo userRepo;
+
 
     @Override
     public void connect(String url, String username, String password ) {
@@ -61,12 +61,14 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
         System.out.println("Connected to SQL database");
     }
 
+
+
     private static void connectToMongoDB(String url) {
         // Create a connection string from the provided URL
         ConnectionString connString = new ConnectionString(url);
 
         // Create a MongoClient instance
-        MongoClient client = MongoClients.create(connString);
+         client = MongoClients.create(connString);
 
         // Access the specified database
         MongoDatabase database = client.getDatabase(connString.getDatabase());
@@ -85,14 +87,10 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
                 });
             }
         } catch (Throwable throwable) {
-            // Handle the exception here
             System.err.println("Exception during MongoDB connection:");
             throwable.printStackTrace();
 
-        } finally {
-            client.close();
         }
-
     }
 
 
@@ -101,26 +99,25 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
 
         try {
             ConnectionString connString = new ConnectionString(connectionString);
-            try (MongoClient mongoClient = MongoClients.create(connString)) {
-                MongoDatabase database = mongoClient.getDatabase(connString.getDatabase());
-                for (String collectionName : database.listCollectionNames()) {
-                    JSONObject collectionObject = new JSONObject();
-                    collectionObject.put("collectionName", collectionName);
+            MongoDatabase database = client.getDatabase(connString.getDatabase());
 
-                    MongoCollection<Document> collection = database.getCollection(collectionName);
-                    Document sampleDocument = collection.find().first();
-                    if (sampleDocument != null) {
-                        JSONObject fieldsObject = new JSONObject();
-                        for (String fieldName : sampleDocument.keySet()) {
-                            Object fieldValue = sampleDocument.get(fieldName);
-                            String fieldType = fieldValue != null ? fieldValue.getClass().getSimpleName() : "test";
-                            fieldsObject.put(fieldName, fieldType);
-                        }
-                        collectionObject.put("fields", fieldsObject);
+            for (String collectionName : database.listCollectionNames()) {
+                JSONObject collectionObject = new JSONObject();
+                collectionObject.put("collectionName", collectionName);
+
+                MongoCollection<Document> collection = database.getCollection(collectionName);
+                Document sampleDocument = collection.find().first();
+                if (sampleDocument != null) {
+                    JSONObject fieldsObject = new JSONObject();
+                    for (String fieldName : sampleDocument.keySet()) {
+                        Object fieldValue = sampleDocument.get(fieldName);
+                        String fieldType = fieldValue != null ? fieldValue.getClass().getSimpleName() : "test";
+                        fieldsObject.put(fieldName, fieldType);
                     }
-
-                    result.put(collectionObject);
+                    collectionObject.put("fields", fieldsObject);
                 }
+
+                result.put(collectionObject);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -357,17 +354,16 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
     @Override
     public Map<String, Map<String, Map<String, List<String>>>> buildTableInfoMongo(String connectionString, JSONArray collections) {
         Map<String, Map<String, Map<String, List<String>>>> result = new TreeMap<>();
-        try (MongoClient mongoClient = MongoClients.create(connectionString)) {
+
+        try {
             ConnectionString connString = new ConnectionString(connectionString);
-            MongoDatabase database = mongoClient.getDatabase(connString.getDatabase());
+            MongoDatabase database = client.getDatabase(connString.getDatabase());
 
             for (int i = 0; i < collections.length(); i++) {
                 JSONObject collectionObj = collections.getJSONObject(i);
 
                 if (!collectionObj.has("collectionName") || !collectionObj.has("fields")) {
-                    // Handle missing collection name or fields
-                    // You can log an error, throw an exception, or handle it as appropriate
-                    continue; // Skip this iteration and proceed to the next collection
+                    continue;
                 }
 
                 String collectionName = collectionObj.getString("collectionName");
@@ -393,25 +389,22 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
                 result.put(collectionName, collectionInfo);
             }
         } catch (JSONException e) {
-            // Handle JSON parsing exceptions
-            e.printStackTrace(); // You can log the error or take other actions
+            e.printStackTrace();
         } catch (MongoException e) {
-            // Handle MongoDB-related exceptions
-            e.printStackTrace(); // You can log the error or take other actions
+            e.printStackTrace();
         }
 
         return result;
     }
 
     @Override
-    public List<Map<String, Object>> executeMongoQueries(String connectionString , Map<String, Object> queryMap) {
+    public List<Map<String, Object>> executeMongoQueries(String connectionString, Map<String, Object> queryMap) {
         List<Map<String, Object>> resultList = new ArrayList<>();
 
-        try (MongoClient mongoClient = MongoClients.create(connectionString)) {
+        try {
             ConnectionString connString = new ConnectionString(connectionString);
-            MongoDatabase database = mongoClient.getDatabase(connString.getDatabase());
+            MongoDatabase database = client.getDatabase(connString.getDatabase());
 
-            // Assuming the queries are in the "queries" sub-map
             Map<String, Object> queries = (Map<String, Object>) queryMap.get("queries");
 
             for (Map.Entry<String, Object> entry : queries.entrySet()) {
@@ -428,12 +421,10 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
                         resultList.add(resultMap);
                     }
                 } catch (Exception e) {
-                    // Handle exceptions appropriately (throw a custom exception or log)
                     e.printStackTrace();
                 }
             }
         } catch (Exception e) {
-            // Handle exceptions appropriately (throw a custom exception or log)
             e.printStackTrace();
         }
         return resultList;
@@ -454,4 +445,33 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
 
         return fieldTextValues;
     }
+
+
+    @Override
+    public void disconnect(String url) {
+        try {
+            if (connection != null) {
+                System.out.println(connection);
+                connection.close();
+                System.out.println("Disconnected from SQL database");
+                System.out.println(connection);
+
+            }
+
+            // Close the MongoDB client explicitly.
+            if (url.startsWith("mongodb://")) {
+
+                // Create a MongoClient instance
+                if (client != null) {
+                    System.out.println(client);
+                    client.close();
+                    System.out.println("Disconnected from MongoDB");
+
+                }
+            }
+        } catch (SQLException | MongoException e) {
+            e.printStackTrace();
+        }
+    }
+
 }

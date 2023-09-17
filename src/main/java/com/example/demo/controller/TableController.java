@@ -11,9 +11,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import java.io.IOException;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/tables")
@@ -119,6 +124,19 @@ public class TableController {
         }
     }
 
+    @PostMapping("/disconnect")
+    public ResponseEntity<?> disconnect(@RequestBody Map<String, String> request) {
+        String url = request.get("url");
+        System.out.println(url);
+        try {
+            databaseMetadataService.disconnect(url);
+            return ResponseEntity.ok("Database connection closed successfully.");
+        } catch (RuntimeException e) {
+            String errorMessage = "Failed to disconnect from the database: " + e.getMessage();
+            System.err.println(errorMessage);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorMessage);
+        }
+    }
 
     private boolean isMongoDB(String url) {
         return url.startsWith("mongodb://");
