@@ -18,6 +18,8 @@ import java.util.stream.Collectors;
 @Service
 public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
     private Connection connection;
+    private static String mongoDatabaseName;
+
 
     private static MongoClient client;
     private String url;
@@ -61,15 +63,13 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
         System.out.println("Connected to SQL database");
     }
 
-
-
     private static void connectToMongoDB(String url) {
         // Create a connection string from the provided URL
         ConnectionString connString = new ConnectionString(url);
 
         // Create a MongoClient instance
          client = MongoClients.create(connString);
-
+        mongoDatabaseName = connString.getDatabase();
         // Access the specified database
         MongoDatabase database = client.getDatabase(connString.getDatabase());
         // List all collections in the database
@@ -90,6 +90,34 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
             System.err.println("Exception during MongoDB connection:");
             throwable.printStackTrace();
 
+        }
+    }
+
+    @Override
+    public String getConnectedDatabaseName() {
+        if (connection != null) {
+            // For PostgreSQL
+            if (url.startsWith("jdbc:postgresql://")) {
+                try {
+                    return connection.getCatalog();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+            // For MongoDB
+            else if (url.startsWith("mongodb://")) {
+                return mongoDatabaseName;
+            }
+        }
+        return null; // Return null if not connected or unsupported database
+    }
+
+    @Override
+    public String getConnectedDatabaseUrl() {
+        if (connection != null || client != null) {
+            return url;
+        } else {
+            return null;
         }
     }
 
@@ -238,7 +266,6 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
     @Override
     public List<Map<String, Object>> executeQueriesAndReturnFirstResult(String query) {
         System.out.println(query);
-        List<Map<String, Object>> firstResult = null;
 
         String[] queries = query.split(";");
         for (String individualQuery : queries) {
@@ -246,14 +273,14 @@ public class DatabaseMetadataServiceImpl implements DatabaseMetadataService {
             if (!individualQuery.isEmpty()) {
                 List<Map<String, Object>> result = executeQuery(individualQuery);
                 if (!result.isEmpty()) {
-                    firstResult = result;
-                    break;
+                    return result; // Return the first non-empty result immediately
                 }
             }
         }
 
-        return firstResult;
+        return null; // Return null if no results are found
     }
+
 
     @Override
     public List<Map<String, Object>> executeQuery(String query) {

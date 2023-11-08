@@ -1,6 +1,7 @@
 package com.example.demo.entity;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.GenericGenerator;
 
@@ -13,6 +14,7 @@ import java.util.List;
 @Entity
 @Table(name = "user_entity")
 public class Utilisateur {
+    @Getter
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO, generator = "uuid")
     @GenericGenerator(name = "uuid", strategy = "org.hibernate.id.UUIDGenerator")
@@ -38,5 +40,7 @@ public class Utilisateur {
     @OneToMany(mappedBy = "utilisateur", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Database> databases;
 
-
+    public void setId(String id) {
+        this.id = id;
+    }
 }

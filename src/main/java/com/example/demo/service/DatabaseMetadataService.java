@@ -40,6 +40,11 @@ public interface DatabaseMetadataService {
 
     List<Map<String, Object>> executeQuery(String query);
 
+
+    String getConnectedDatabaseName();
+
+    String getConnectedDatabaseUrl();
+
     JSONArray getMongoMetaData(String url);
 
 
