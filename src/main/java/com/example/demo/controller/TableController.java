@@ -224,7 +224,7 @@ public class TableController {
             String queryName = request.get("queryName");
 
             if (query == null || query.isEmpty() || queryBuilders == null || queryBuilders.isEmpty() || queryName == null || queryName.isEmpty()) {
-                return ResponseEntity.badRequest().body("Missing or empty request parameters.");
+                return ResponseEntity.badRequest().body("{\"error\": \"Missing or empty request parameters.\"}");
             }
 
             uniqueQueries.add(query);
@@ -239,7 +239,7 @@ public class TableController {
 
             if (selectedDatabase == null) {
                 String errorMessage = "No database found for the authenticated user or matching the URL (user ID: " + (utilisateur != null ? utilisateur.getId() : "N/A") + ")";
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.singletonMap("error", errorMessage));
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("{\"error\": \"" + errorMessage + "\"}");
             }
 
             // Save the query
@@ -257,12 +257,13 @@ public class TableController {
             // Clear the set of unique queries since we executed the combined query
             uniqueQueries.clear();
 
-            return ResponseEntity.ok("Query saved successfully.");
+            return ResponseEntity.ok("{\"success\": true}");
         } catch (Exception e) {
             String errorMessage = "Failed to save the query: " + e.getMessage();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Collections.singletonMap("error", errorMessage));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("{\"error\": \"" + errorMessage + "\"}");
         }
     }
+
 
 
 
@@ -337,6 +338,26 @@ public class TableController {
             e.printStackTrace();
             String errorMessage = "Failed to fetch queries by database: " + e.getMessage();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorMessage);
+        }
+    }
+
+    @DeleteMapping("/queries/{queryId}")
+    public ResponseEntity<?> deleteQueryById(@PathVariable Long queryId) {
+        try {
+            // Check if the query with the given ID exists
+            if (!queryRepo.existsById(queryId)) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Query not found");
+            }
+
+            // Delete the query by ID
+            queryRepo.deleteById(queryId);
+
+            return ResponseEntity.ok().body("{\"success\": true}");
+        } catch (Exception e) {
+            // Log the exception here
+            e.printStackTrace();
+            String errorMessage = "Failed to delete query: " + e.getMessage();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("{\"error\": \"" + errorMessage + "\"}");
         }
     }
 
